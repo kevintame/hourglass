@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up Hourglass database and uploads
+
+[Service]
+Type=oneshot
+User=hourglass
+Group=hourglass
+EnvironmentFile=/etc/hourglass/hourglass.env
+ExecStart=/opt/hourglass/deploy/backup.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/hourglass /var/lib/hourglass

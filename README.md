@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hourglass
 
-## Getting Started
+Hourglass is a private, single-owner time tracker and invoicing app built for a Proxmox LXC. It keeps the web interface, PostgreSQL database, uploaded branding, and invoice data inside the container.
 
-First, run the development server:
+## Features
+
+- Persistent start/stop timer and manual time entry
+- Clients, projects, hourly rates, and billable work
+- Per-entry quarter-hour billing rounded upward
+- Sequential invoices with grouped or detailed time
+- Fixed-fee lines, tax, payment terms, client overrides, and PDF export
+- Draft, sent, paid, and void states
+- Private owner login with database-backed sessions
+- Responsive desktop and mobile interface
+
+## Development
+
+Requirements: Node.js 22 and PostgreSQL 15 or newer.
 
 ```bash
+cp .env.example .env
+npm install
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. The first visit creates the owner account. Run `npm test`, `npm run lint`, and `npm run build` before release.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Proxmox LXC installation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create an unprivileged Debian 12 or 13 LXC with at least 2 CPU cores, 2 GB RAM, and 8 GB disk. Assign its network in Proxmox; the intended example is `10.69.4.130/24` with gateway `10.69.4.1`.
 
-## Learn More
+Copy or clone this repository into the LXC, then run as root:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+bash deploy/install.sh
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The installer adds Node.js 22 and PostgreSQL, creates restricted service and database accounts, installs the app at `/opt/hourglass`, runs migrations, builds it, enables daily backups, and starts it on port 3000.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Point the existing Cloudflared tunnel at `http://10.69.4.130:3000`, then open the HTTPS hostname to create the owner account. Cloudflared terminates HTTPS and the app uses secure cookies in production. Keep port 3000 private to the LAN and optionally configure Cloudflare Access as an additional identity gate.
 
-## Deploy on Vercel
+### Operations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+systemctl status hourglass
+journalctl -u hourglass -f
+curl http://127.0.0.1:3000/api/health
+bash /opt/hourglass/deploy/update.sh
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Configuration lives at `/etc/hourglass/hourglass.env`. Uploaded logos live in `/var/lib/hourglass/uploads`. Daily compressed backups are retained for 14 days under `/var/backups/hourglass`; copy that directory off the LXC or include it in Proxmox backups.
+
+To restore, stop Hourglass, restore the newest database dump with `gunzip -c backup.sql.gz | runuser -u postgres -- psql hourglass`, restore the uploads archive into `/var/lib/hourglass/uploads`, and restart the service.

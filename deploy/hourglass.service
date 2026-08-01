@@ -1,0 +1,25 @@
+[Unit]
+Description=Hourglass time tracking and invoicing
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hourglass
+Group=hourglass
+WorkingDirectory=/opt/hourglass
+EnvironmentFile=/etc/hourglass/hourglass.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hourglass /var/backups/hourglass
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
