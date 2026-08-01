@@ -26,19 +26,33 @@ npm run dev
 
 Open `http://localhost:3000`. The first visit creates the owner account. Run `npm test`, `npm run lint`, and `npm run build` before release.
 
-## Proxmox LXC installation
+## Proxmox VE installation (one command)
 
-Create an unprivileged Debian 12 or 13 LXC with at least 2 CPU cores, 2 GB RAM, and 8 GB disk. Assign its network in Proxmox; the intended example is `10.69.4.130/24` with gateway `10.69.4.1`.
+In the Proxmox host shell (console of the node, as root), run:
 
-Copy or clone this repository into the LXC, then run as root:
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/main/deploy/proxmox.sh)"
+```
+
+In the style of the [Proxmox VE community scripts](https://community-scripts.github.io/ProxmoxVE/), this creates an unprivileged Debian 12 LXC (2 cores, 2 GB RAM, 8 GB disk, DHCP on `vmbr0` by default), clones this repository into it, and runs the installer — Node.js 22, PostgreSQL, restricted service accounts, migrations, build, daily backups, and the systemd service on port 3000.
+
+Defaults can be overridden with environment variables, e.g.:
+
+```bash
+CTID=130 DISK_GB=12 NET=192.168.1.50/24 GATEWAY=192.168.1.1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/main/deploy/proxmox.sh)"
+```
+
+Available overrides: `CTID`, `CT_HOSTNAME`, `CORES`, `RAM_MB`, `SWAP_MB`, `DISK_GB`, `BRIDGE`, `NET` (dhcp or CIDR), `GATEWAY`, `ROOTFS_STORAGE`, `TEMPLATE_STORAGE`, `YES=1` (skip confirmation).
+
+### Manual LXC installation
+
+Alternatively, create a Debian 12 or 13 LXC yourself, clone this repository into it at `/opt/hourglass`, and run as root:
 
 ```bash
 bash deploy/install.sh
 ```
 
-The installer adds Node.js 22 and PostgreSQL, creates restricted service and database accounts, installs the app at `/opt/hourglass`, runs migrations, builds it, enables daily backups, and starts it on port 3000.
-
-Point the existing Cloudflared tunnel at `http://10.69.4.130:3000`, then open the HTTPS hostname to create the owner account. Cloudflared terminates HTTPS and the app uses secure cookies in production. Keep port 3000 private to the LAN and optionally configure Cloudflare Access as an additional identity gate.
+Point a reverse proxy or Cloudflared tunnel at `http://<container-ip>:3000`, then open the HTTPS hostname to create the owner account. The proxy terminates HTTPS and the app uses secure cookies in production. Keep port 3000 private to the LAN and optionally configure Cloudflare Access as an additional identity gate.
 
 ### Operations
 
