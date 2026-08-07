@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeo pipefail
+set +u
 
 # Backward-compatible entry point. The canonical Community Scripts-style
 # container builder lives at ct/hourglass.sh.

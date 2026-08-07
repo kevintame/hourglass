@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set +u
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVED/main/misc/build.func)
 
 # Keep all framework files on the official Community Scripts origin, but fetch
