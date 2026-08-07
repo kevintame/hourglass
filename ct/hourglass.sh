@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVED/main/misc/build.func)
 
-# Hourglass uses the Community Scripts build framework while keeping its
-# application installer in the Hourglass repository.
-export COMMUNITY_SCRIPTS_URL="${HOURGLASS_SCRIPTS_URL:-https://raw.githubusercontent.com/kevintame/hourglass/main}"
+# Keep all framework files on the official Community Scripts origin, but fetch
+# Hourglass's app-specific installer from this repository. build.func uses this
+# helper for both kinds of files, so changing COMMUNITY_SCRIPTS_URL globally
+# would incorrectly redirect misc/tools.func and the other shared libraries.
+_cs_fetch_text() {
+  local relative_file="${1:?relative file is required}"
+  if [[ "$relative_file" == "install/hourglass-install.sh" ]]; then
+    curl -fsSL "${HOURGLASS_SCRIPTS_URL:-https://raw.githubusercontent.com/kevintame/hourglass/main}/${relative_file}"
+  else
+    curl -fsSL "${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/community-scripts/ProxmoxVED/main}/${relative_file}"
+  fi
+}
 
 APP="Hourglass"
 var_tags="${var_tags:-time-tracking;invoicing;finance}"
