@@ -5,6 +5,7 @@ Hourglass is a private, single-owner time tracker and invoicing app built for a 
 ## Features
 
 - Persistent start/stop timer and manual time entry
+- Reimbursable client expenses with itemized billing and PDF/image receipt attachments
 - Clients, projects, hourly rates, and billable work
 - Per-entry quarter-hour billing rounded upward
 - Sequential invoices with grouped or detailed time

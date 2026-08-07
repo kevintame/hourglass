@@ -10,12 +10,19 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { clients, invoiceLines, invoices, invoiceTimeEntries, loginAttempts, projects, settings, timeEntries, users } from "@/db/schema";
+import { clients, expenses, invoiceExpenses, invoiceLines, invoices, invoiceTimeEntries, loginAttempts, projects, settings, timeEntries, users } from "@/db/schema";
 import { createSession, destroySession, requireUser } from "@/lib/auth";
-import { parseMoney, roundBillableMinutes } from "@/lib/money";
+import { calculateInvoiceAmounts, parseMoney, roundBillableMinutes } from "@/lib/money";
+import { deleteReceipt, saveReceipt } from "@/lib/receipts";
 
 const text = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
 const int = (form: FormData, key: string) => Number.parseInt(text(form, key), 10);
+const expenseCategories = ["airfare", "lodging", "meals", "ground_transport", "mileage", "supplies", "other"] as const;
+type ExpenseCategory = (typeof expenseCategories)[number];
+
+function expenseError(message: string) {
+  redirect(`/expenses?error=${encodeURIComponent(message)}`);
+}
 
 export async function setupAction(form: FormData) {
   const existing = await db.select({ id: users.id }).from(users).limit(1);
@@ -138,6 +145,104 @@ export async function archiveProjectAction(form: FormData) {
 
 export async function updateProjectAction(form:FormData){await requireUser();const id=int(form,"id");await db.update(projects).set({name:text(form,"name"),code:text(form,"code"),hourlyRate:parseMoney(form.get("hourlyRate")),billable:form.get("billable")!==null}).where(eq(projects.id,id));revalidatePath("/projects");revalidatePath("/time");}
 
+async function expenseValues(form: FormData) {
+  const clientId = int(form, "clientId");
+  const projectId = int(form, "projectId") || null;
+  const expenseDate = text(form, "expenseDate");
+  const category = text(form, "category") as ExpenseCategory;
+  const description = text(form, "description");
+  const amount = parseMoney(form.get("amount"));
+  if (!clientId || !/^\d{4}-\d{2}-\d{2}$/.test(expenseDate) || !expenseCategories.includes(category) || !description || amount <= 0) expenseError("Enter a client, date, category, description, and positive amount");
+  const [[client], [business]] = await Promise.all([
+    db.select().from(clients).where(eq(clients.id, clientId)).limit(1),
+    db.select({ currency: settings.currency }).from(settings).where(eq(settings.id, 1)).limit(1),
+  ]);
+  if (!client || !business) expenseError("Client or business settings could not be found");
+  if (projectId) {
+    const [project] = await db.select({ clientId: projects.clientId }).from(projects).where(eq(projects.id, projectId)).limit(1);
+    if (!project || project.clientId !== clientId) expenseError("Selected project does not belong to this client");
+  }
+  return {
+    clientId,
+    projectId,
+    expenseDate,
+    category,
+    vendor: text(form, "vendor").slice(0, 160),
+    description,
+    amount,
+    currency: (client.currency ?? business.currency).toUpperCase().slice(0, 3),
+    taxable: form.get("taxable") !== null,
+  };
+}
+
+export async function createExpenseAction(form: FormData) {
+  await requireUser();
+  const values = await expenseValues(form);
+  const receipt = form.get("receipt");
+  let savedReceipt: Awaited<ReturnType<typeof saveReceipt>> | null = null;
+  if (receipt instanceof File && receipt.size > 0) {
+    try { savedReceipt = await saveReceipt(receipt); }
+    catch (error) { expenseError(error instanceof Error ? error.message : "Receipt could not be saved"); }
+  }
+  try {
+    await db.insert(expenses).values({
+      ...values,
+      receiptFilename: savedReceipt?.filename ?? null,
+      receiptOriginalName: savedReceipt?.originalName ?? null,
+      receiptMimeType: savedReceipt?.mimeType ?? null,
+    });
+  } catch (error) {
+    await deleteReceipt(savedReceipt?.filename);
+    throw error;
+  }
+  revalidatePath("/expenses");
+  revalidatePath("/invoices/new");
+}
+
+export async function updateExpenseAction(form: FormData) {
+  await requireUser();
+  const id = int(form, "id");
+  const [existing] = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  if (!existing) expenseError("Expense could not be found");
+  const billed = await db.select({ invoiceId: invoiceExpenses.invoiceId }).from(invoiceExpenses).where(eq(invoiceExpenses.expenseId, id)).limit(1);
+  if (billed.length) expenseError("Billed expenses cannot be edited");
+  const values = await expenseValues(form);
+  const receipt = form.get("receipt");
+  const removeExisting = form.get("removeReceipt") !== null;
+  let savedReceipt: Awaited<ReturnType<typeof saveReceipt>> | null = null;
+  if (receipt instanceof File && receipt.size > 0) {
+    try { savedReceipt = await saveReceipt(receipt); }
+    catch (error) { expenseError(error instanceof Error ? error.message : "Receipt could not be saved"); }
+  }
+  const receiptValues = savedReceipt
+    ? { receiptFilename: savedReceipt.filename, receiptOriginalName: savedReceipt.originalName, receiptMimeType: savedReceipt.mimeType }
+    : removeExisting
+      ? { receiptFilename: null, receiptOriginalName: null, receiptMimeType: null }
+      : {};
+  try {
+    await db.update(expenses).set({ ...values, ...receiptValues, updatedAt: new Date() }).where(eq(expenses.id, id));
+  } catch (error) {
+    await deleteReceipt(savedReceipt?.filename);
+    throw error;
+  }
+  if ((savedReceipt || removeExisting) && existing.receiptFilename) await deleteReceipt(existing.receiptFilename);
+  revalidatePath("/expenses");
+  revalidatePath("/invoices/new");
+}
+
+export async function deleteExpenseAction(form: FormData) {
+  await requireUser();
+  const id = int(form, "id");
+  const [existing] = await db.select().from(expenses).where(eq(expenses.id, id)).limit(1);
+  if (!existing) return;
+  const billed = await db.select({ invoiceId: invoiceExpenses.invoiceId }).from(invoiceExpenses).where(eq(invoiceExpenses.expenseId, id)).limit(1);
+  if (billed.length) expenseError("Billed expenses cannot be deleted");
+  await db.delete(expenses).where(eq(expenses.id, id));
+  await deleteReceipt(existing.receiptFilename);
+  revalidatePath("/expenses");
+  revalidatePath("/invoices/new");
+}
+
 export async function saveSettingsAction(form: FormData) {
   await requireUser();
   const [existing]=await db.select().from(settings).where(eq(settings.id,1)).limit(1);
@@ -160,47 +265,75 @@ export async function saveSettingsAction(form: FormData) {
 export async function createInvoiceAction(form: FormData) {
   await requireUser();
   const clientId = int(form, "clientId");
-  const selectedIds = form.getAll("entryId").map(String);
-  if (!clientId || !selectedIds.length) redirect(`/invoices/new?clientId=${clientId || ""}&error=Select+at+least+one+time+entry`);
-  const newId = await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(68472819)`);
-    const [business] = await tx.select().from(settings).where(eq(settings.id, 1)).limit(1);
-    const [client] = await tx.select().from(clients).where(eq(clients.id, clientId)).limit(1);
-    if (!business || !client) throw new Error("Missing business or client");
-    const rows = await tx.select({ entry: timeEntries, project: projects }).from(timeEntries).innerJoin(projects, eq(timeEntries.projectId, projects.id)).leftJoin(invoiceTimeEntries, eq(timeEntries.id, invoiceTimeEntries.timeEntryId)).where(and(inArray(timeEntries.id, selectedIds), eq(projects.clientId, clientId), sql`${timeEntries.endedAt} is not null`, eq(timeEntries.billable, true), isNull(invoiceTimeEntries.timeEntryId))).orderBy(asc(timeEntries.startedAt));
-    if (!rows.length) throw new Error("No unbilled entries selected");
-    const year = new Date().getFullYear();
-    const prefix = business.invoicePrefix || "INV";
-    const recent = await tx.select({ number: invoices.number }).from(invoices).where(sql`${invoices.number} like ${`${prefix}-${year}-%`}`).orderBy(desc(invoices.number)).limit(1);
-    const seq = recent[0] ? Number(recent[0].number.split("-").at(-1)) + 1 : 1;
-    const number = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
-    const issueDate = text(form, "issueDate") || new Date().toISOString().slice(0, 10);
-    const terms = client.paymentTermsDays ?? business.paymentTermsDays;
-    const due = new Date(`${issueDate}T12:00:00Z`); due.setUTCDate(due.getUTCDate() + terms);
-    const currency = client.currency ?? business.currency;
-    const taxBps = client.taxBps ?? business.taxBps;
-    const mode = text(form, "detailMode") === "detailed" ? "detailed" as const : "grouped" as const;
-    const builtLines: Array<{ projectId: number; kind: "time"; description: string; quantity: number; unitAmount: number; amount: number; sortOrder: number }> = [];
-    if (mode === "detailed") {
-      rows.forEach(({ entry, project }, i) => {
-        const mins = roundBillableMinutes(entry.durationSeconds ?? 0);
-        builtLines.push({ projectId: project.id, kind: "time", description: `${project.name} · ${entry.startedAt.toISOString().slice(0,10)}${entry.notes ? ` · ${entry.notes}` : ""}`, quantity: mins, unitAmount: project.hourlyRate, amount: Math.round(mins * project.hourlyRate / 60), sortOrder: i });
-      });
-    } else {
-      const grouped = new Map<number, { project: typeof rows[number]["project"]; mins: number }>();
-      rows.forEach(({ entry, project }) => { const current = grouped.get(project.id) ?? { project, mins: 0 }; current.mins += roundBillableMinutes(entry.durationSeconds ?? 0); grouped.set(project.id, current); });
-      Array.from(grouped.values()).forEach(({ project, mins }, i) => builtLines.push({ projectId: project.id, kind: "time", description: project.name, quantity: mins, unitAmount: project.hourlyRate, amount: Math.round(mins * project.hourlyRate / 60), sortOrder: i }));
-    }
-    const fixedDescription = text(form, "fixedDescription");
-    const fixedAmount = parseMoney(form.get("fixedAmount"));
-    const subtotal = builtLines.reduce((sum, line) => sum + line.amount, 0) + (fixedDescription && fixedAmount ? fixedAmount : 0);
-    const taxAmount = Math.round(subtotal * taxBps / 10000);
-    const [invoice] = await tx.insert(invoices).values({ number, clientId, issueDate, dueDate: due.toISOString().slice(0,10), currency, taxBps, detailMode: mode, subtotal, taxAmount, total: subtotal + taxAmount, notes: text(form, "notes"), businessSnapshot: business, clientSnapshot: client }).returning({ id: invoices.id });
-    if (builtLines.length) await tx.insert(invoiceLines).values(builtLines.map((line) => ({ ...line, invoiceId: invoice.id })));
-    if (fixedDescription && fixedAmount) await tx.insert(invoiceLines).values({ invoiceId: invoice.id, kind: "fixed", description: fixedDescription, quantity: 100, unitAmount: fixedAmount, amount: fixedAmount, sortOrder: builtLines.length });
-    await tx.insert(invoiceTimeEntries).values(rows.map(({ entry }) => ({ invoiceId: invoice.id, timeEntryId: entry.id, roundedMinutes: roundBillableMinutes(entry.durationSeconds ?? 0) })));
-    return invoice.id;
-  });
+  const selectedTimeIds = [...new Set(form.getAll("entryId").map(String).filter(Boolean))];
+  const selectedExpenseIds = [...new Set(form.getAll("expenseId").map(Number).filter(Number.isInteger))];
+  if (!clientId || (!selectedTimeIds.length && !selectedExpenseIds.length)) redirect(`/invoices/new?clientId=${clientId || ""}&error=Select+at+least+one+time+entry+or+expense`);
+  let newId: number;
+  try {
+    newId = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(68472819)`);
+      const [business] = await tx.select().from(settings).where(eq(settings.id, 1)).limit(1);
+      const [client] = await tx.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+      if (!business || !client) throw new Error("Missing business or client");
+      const currency = client.currency ?? business.currency;
+      const timeRows = selectedTimeIds.length ? await tx.select({ entry: timeEntries, project: projects })
+        .from(timeEntries)
+        .innerJoin(projects, eq(timeEntries.projectId, projects.id))
+        .leftJoin(invoiceTimeEntries, eq(timeEntries.id, invoiceTimeEntries.timeEntryId))
+        .where(and(inArray(timeEntries.id, selectedTimeIds), eq(projects.clientId, clientId), sql`${timeEntries.endedAt} is not null`, eq(timeEntries.billable, true), isNull(invoiceTimeEntries.timeEntryId)))
+        .orderBy(asc(timeEntries.startedAt)) : [];
+      const expenseRows = selectedExpenseIds.length ? await tx.select({ expense: expenses })
+        .from(expenses)
+        .leftJoin(invoiceExpenses, eq(expenses.id, invoiceExpenses.expenseId))
+        .where(and(inArray(expenses.id, selectedExpenseIds), eq(expenses.clientId, clientId), eq(expenses.currency, currency), isNull(invoiceExpenses.expenseId)))
+        .orderBy(asc(expenses.expenseDate), asc(expenses.id)) : [];
+      if (timeRows.length !== selectedTimeIds.length || expenseRows.length !== selectedExpenseIds.length) throw new Error("One or more selected items are no longer billable");
+      const year = new Date().getFullYear();
+      const prefix = business.invoicePrefix || "INV";
+      const recent = await tx.select({ number: invoices.number }).from(invoices).where(sql`${invoices.number} like ${`${prefix}-${year}-%`}`).orderBy(desc(invoices.number)).limit(1);
+      const seq = recent[0] ? Number(recent[0].number.split("-").at(-1)) + 1 : 1;
+      const number = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
+      const issueDate = text(form, "issueDate") || new Date().toISOString().slice(0, 10);
+      const terms = client.paymentTermsDays ?? business.paymentTermsDays;
+      const due = new Date(`${issueDate}T12:00:00Z`); due.setUTCDate(due.getUTCDate() + terms);
+      const taxBps = client.taxBps ?? business.taxBps;
+      const mode = text(form, "detailMode") === "detailed" ? "detailed" as const : "grouped" as const;
+      const builtLines: Array<{ projectId: number | null; kind: "time" | "expense" | "fixed"; description: string; quantity: number; unitAmount: number; amount: number; taxable: boolean; sortOrder: number }> = [];
+      if (mode === "detailed") {
+        timeRows.forEach(({ entry, project }) => {
+          const mins = roundBillableMinutes(entry.durationSeconds ?? 0);
+          builtLines.push({ projectId: project.id, kind: "time", description: `${project.name} · ${entry.startedAt.toISOString().slice(0, 10)}${entry.notes ? ` · ${entry.notes}` : ""}`, quantity: mins, unitAmount: project.hourlyRate, amount: Math.round(mins * project.hourlyRate / 60), taxable: true, sortOrder: builtLines.length });
+        });
+      } else {
+        const grouped = new Map<number, { project: typeof timeRows[number]["project"]; mins: number }>();
+        timeRows.forEach(({ entry, project }) => { const current = grouped.get(project.id) ?? { project, mins: 0 }; current.mins += roundBillableMinutes(entry.durationSeconds ?? 0); grouped.set(project.id, current); });
+        Array.from(grouped.values()).forEach(({ project, mins }) => builtLines.push({ projectId: project.id, kind: "time", description: project.name, quantity: mins, unitAmount: project.hourlyRate, amount: Math.round(mins * project.hourlyRate / 60), taxable: true, sortOrder: builtLines.length }));
+      }
+      const expenseLabels: Record<ExpenseCategory, string> = { airfare: "Airfare", lodging: "Lodging", meals: "Meals", ground_transport: "Ground transport", mileage: "Mileage", supplies: "Supplies", other: "Other" };
+      expenseRows.forEach(({ expense }) => builtLines.push({
+        projectId: expense.projectId,
+        kind: "expense",
+        description: `${expense.expenseDate} · ${expenseLabels[expense.category]}${expense.vendor ? ` · ${expense.vendor}` : ""} · ${expense.description}`,
+        quantity: 100,
+        unitAmount: expense.amount,
+        amount: expense.amount,
+        taxable: expense.taxable,
+        sortOrder: builtLines.length,
+      }));
+      const fixedDescription = text(form, "fixedDescription");
+      const fixedAmount = parseMoney(form.get("fixedAmount"));
+      if (fixedDescription && fixedAmount > 0) builtLines.push({ projectId: null, kind: "fixed", description: fixedDescription, quantity: 100, unitAmount: fixedAmount, amount: fixedAmount, taxable: true, sortOrder: builtLines.length });
+      const amounts = calculateInvoiceAmounts(builtLines, taxBps);
+      const [invoice] = await tx.insert(invoices).values({ number, clientId, issueDate, dueDate: due.toISOString().slice(0, 10), currency, taxBps, detailMode: mode, subtotal: amounts.subtotal, taxAmount: amounts.taxAmount, total: amounts.total, notes: text(form, "notes"), businessSnapshot: business, clientSnapshot: client }).returning({ id: invoices.id });
+      await tx.insert(invoiceLines).values(builtLines.map((line) => ({ ...line, invoiceId: invoice.id })));
+      if (timeRows.length) await tx.insert(invoiceTimeEntries).values(timeRows.map(({ entry }) => ({ invoiceId: invoice.id, timeEntryId: entry.id, roundedMinutes: roundBillableMinutes(entry.durationSeconds ?? 0) })));
+      if (expenseRows.length) await tx.insert(invoiceExpenses).values(expenseRows.map(({ expense }) => ({ invoiceId: invoice.id, expenseId: expense.id })));
+      return invoice.id;
+    });
+  } catch (error) {
+    console.error("Could not create invoice", error);
+    redirect(`/invoices/new?clientId=${clientId}&error=Selected+items+could+not+be+invoiced.+Reload+and+try+again`);
+  }
   redirect(`/invoices/${newId}`);
 }
 

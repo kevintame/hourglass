@@ -8,6 +8,13 @@ export function parseMoney(value: FormDataEntryValue | null) {
   return Math.round(amount * 100);
 }
 
+export function calculateInvoiceAmounts(lines: Array<{ amount: number; taxable: boolean }>, taxBps: number) {
+  const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+  const taxableSubtotal = lines.reduce((sum, line) => sum + (line.taxable ? line.amount : 0), 0);
+  const taxAmount = Math.round(taxableSubtotal * taxBps / 10000);
+  return { subtotal, taxableSubtotal, taxAmount, total: subtotal + taxAmount };
+}
+
 export function roundBillableMinutes(seconds: number) {
   if (seconds <= 0) return 0;
   return Math.ceil(seconds / 900) * 15;

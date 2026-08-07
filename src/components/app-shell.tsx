@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, BriefcaseBusiness, Clock3, FileText, LogOut, Settings, UsersRound } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Clock3, FileText, LogOut, Receipt, Settings, UsersRound } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 
 const links = [
@@ -7,6 +7,7 @@ const links = [
   { href: "/time", label: "Time", icon: Clock3 },
   { href: "/clients", label: "Clients", icon: UsersRound },
   { href: "/projects", label: "Projects", icon: BriefcaseBusiness },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -22,7 +23,7 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
       </div>
     </aside>
     <main className="main">{children}</main>
-    <nav className="mobile-nav">{links.slice(0,5).map(({href,label,icon:Icon}) => <Link href={href} key={href}><Icon size={19}/><span>{label}</span></Link>)}</nav>
+    <nav className="mobile-nav">{links.slice(0,6).map(({href,label,icon:Icon}) => <Link href={href} key={href}><Icon size={19}/><span>{label}</span></Link>)}</nav>
   </div>;
 }
 

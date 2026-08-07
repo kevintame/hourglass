@@ -3,7 +3,8 @@ import { sql } from "drizzle-orm";
 
 export const invoiceStatus = pgEnum("invoice_status", ["draft", "sent", "paid", "void"]);
 export const detailMode = pgEnum("detail_mode", ["grouped", "detailed"]);
-export const lineKind = pgEnum("line_kind", ["time", "fixed"]);
+export const lineKind = pgEnum("line_kind", ["time", "fixed", "expense"]);
+export const expenseCategory = pgEnum("expense_category", ["airfare", "lodging", "meals", "ground_transport", "mileage", "supplies", "other"]);
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -82,6 +83,28 @@ export const timeEntries = pgTable("time_entries", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("time_entries_project_idx").on(t.projectId), index("time_entries_started_idx").on(t.startedAt), uniqueIndex("one_active_timer_per_user").on(t.userId).where(sql`${t.endedAt} is null`), check("time_entries_valid_range", sql`(${t.endedAt} is null and ${t.durationSeconds} is null) or (${t.endedAt} > ${t.startedAt} and ${t.durationSeconds} > 0)`) ]);
 
+export const expenses = pgTable("expenses", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  projectId: integer("project_id").references(() => projects.id),
+  expenseDate: date("expense_date").notNull(),
+  category: expenseCategory("category").notNull(),
+  vendor: varchar("vendor", { length: 160 }).notNull().default(""),
+  description: text("description").notNull(),
+  amount: integer("amount").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  taxable: boolean("taxable").notNull().default(false),
+  receiptFilename: varchar("receipt_filename", { length: 120 }),
+  receiptOriginalName: varchar("receipt_original_name", { length: 255 }),
+  receiptMimeType: varchar("receipt_mime_type", { length: 80 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("expenses_client_date_idx").on(t.clientId, t.expenseDate),
+  index("expenses_project_idx").on(t.projectId),
+  check("expenses_amount_valid", sql`${t.amount} > 0`),
+]);
+
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   number: varchar("number", { length: 40 }).notNull().unique(),
@@ -113,6 +136,7 @@ export const invoiceLines = pgTable("invoice_lines", {
   quantity: integer("quantity").notNull(),
   unitAmount: integer("unit_amount").notNull(),
   amount: integer("amount").notNull(),
+  taxable: boolean("taxable").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
 }, (t) => [index("invoice_lines_invoice_idx").on(t.invoiceId), check("invoice_lines_values_valid", sql`${t.quantity} > 0 and ${t.unitAmount} >= 0 and ${t.amount} >= 0`)]);
 
@@ -121,3 +145,8 @@ export const invoiceTimeEntries = pgTable("invoice_time_entries", {
   timeEntryId: uuid("time_entry_id").notNull().references(() => timeEntries.id),
   roundedMinutes: integer("rounded_minutes").notNull(),
 }, (t) => [primaryKey({ columns: [t.invoiceId, t.timeEntryId] }), uniqueIndex("time_entry_billed_once").on(t.timeEntryId)]);
+
+export const invoiceExpenses = pgTable("invoice_expenses", {
+  invoiceId: integer("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  expenseId: integer("expense_id").notNull().references(() => expenses.id),
+}, (t) => [primaryKey({ columns: [t.invoiceId, t.expenseId] }), uniqueIndex("expense_billed_once").on(t.expenseId)]);
