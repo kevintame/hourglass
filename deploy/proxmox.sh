@@ -44,6 +44,68 @@ ROOTFS_STORAGE="${ROOTFS_STORAGE:-$(pvesm status -content rootdir | awk 'NR==2{p
 [[ -n "$TEMPLATE_STORAGE" ]] || { err "No storage with 'vztmpl' content found."; exit 1; }
 [[ -n "$ROOTFS_STORAGE" ]] || { err "No storage with 'rootdir' content found."; exit 1; }
 
+prompt_value() {
+  local label="$1" current="$2" answer
+  read -rp "${label} [${current}]: " answer
+  printf '%s' "${answer:-$current}"
+}
+
+choose_storage() {
+  local label="$1" content="$2" current="$3" answer options
+  options="$(pvesm status -content "$content" | awk 'NR>1 {print $1}' | sort -u | paste -sd, -)"
+  read -rp "${label} (${options}) [${current}]: " answer
+  answer="${answer:-$current}"
+  pvesm status -content "$content" | awk 'NR>1 {print $1}' | grep -Fxq "$answer" || {
+    err "Storage '$answer' does not support $content content."
+    return 1
+  }
+  printf '%s' "$answer"
+}
+
+if [[ -t 0 && "${YES:-}" != "1" ]]; then
+  echo -e "Choose installation settings:
+  ${GN}1)${CL} Default settings
+  ${YW}2)${CL} Advanced settings"
+  read -rp "Selection [1]: " SETTINGS_MODE
+  SETTINGS_MODE="${SETTINGS_MODE:-1}"
+
+  if [[ "$SETTINGS_MODE" == "2" ]]; then
+    echo
+    msg "Advanced settings (press Enter to accept each value)"
+    CTID="$(prompt_value "Container ID" "$CTID")"
+    CT_HOSTNAME="$(prompt_value "Hostname" "$CT_HOSTNAME")"
+    CORES="$(prompt_value "CPU cores" "$CORES")"
+    RAM_MB="$(prompt_value "RAM in MiB" "$RAM_MB")"
+    SWAP_MB="$(prompt_value "Swap in MiB" "$SWAP_MB")"
+    DISK_GB="$(prompt_value "Disk size in GiB" "$DISK_GB")"
+    BRIDGE="$(prompt_value "Network bridge" "$BRIDGE")"
+    ROOTFS_STORAGE="$(choose_storage "Container storage" rootdir "$ROOTFS_STORAGE")"
+    TEMPLATE_STORAGE="$(choose_storage "Template storage" vztmpl "$TEMPLATE_STORAGE")"
+
+    read -rp "Use DHCP? [Y/n]: " USE_DHCP
+    if [[ "${USE_DHCP:-y}" =~ ^[Nn]$ ]]; then
+      NET="$(prompt_value "Static address with CIDR (for example 192.168.1.50/24)" "${NET/dhcp/192.168.1.50\/24}")"
+      GATEWAY="$(prompt_value "Gateway" "${GATEWAY:-192.168.1.1}")"
+    else
+      NET="dhcp"
+      GATEWAY=""
+    fi
+  elif [[ "$SETTINGS_MODE" != "1" ]]; then
+    err "Invalid selection: $SETTINGS_MODE"
+    exit 1
+  fi
+fi
+
+[[ "$CTID" =~ ^[0-9]+$ ]] || { err "Container ID must be numeric."; exit 1; }
+[[ "$CORES" =~ ^[1-9][0-9]*$ ]] || { err "CPU cores must be a positive integer."; exit 1; }
+[[ "$RAM_MB" =~ ^[1-9][0-9]*$ ]] || { err "RAM must be a positive integer."; exit 1; }
+[[ "$SWAP_MB" =~ ^[0-9]+$ ]] || { err "Swap must be a non-negative integer."; exit 1; }
+[[ "$DISK_GB" =~ ^[1-9][0-9]*$ ]] || { err "Disk size must be a positive integer."; exit 1; }
+if pct status "$CTID" >/dev/null 2>&1; then
+  err "Container ID $CTID already exists. Choose another ID."
+  exit 1
+fi
+
 echo -e "  Container ID:   ${YW}${CTID}${CL}
   Hostname:       ${YW}${CT_HOSTNAME}${CL}
   Resources:      ${YW}${CORES} cores / ${RAM_MB} MiB RAM / ${DISK_GB} GiB disk${CL}

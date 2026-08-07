@@ -34,7 +34,7 @@ In the Proxmox host shell (console of the node, as root), run:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/main/deploy/proxmox.sh)"
 ```
 
-In the style of the [Proxmox VE community scripts](https://community-scripts.github.io/ProxmoxVE/), this creates an unprivileged Debian 12 LXC (2 cores, 2 GB RAM, 8 GB disk, DHCP on `vmbr0` by default), clones this repository into it, and runs the installer — Node.js 22, PostgreSQL, restricted service accounts, migrations, build, daily backups, and the systemd service on port 3000.
+In the style of the [Proxmox VE community scripts](https://community-scripts.github.io/ProxmoxVE/), the installer lets you choose default or advanced settings before it creates anything. Advanced settings cover the container ID, hostname, CPU, RAM, swap, disk, bridge, DHCP or static networking, and Proxmox storage. It then creates an unprivileged Debian 12 LXC, clones this repository into it, and installs Node.js 22, PostgreSQL, restricted service accounts, migrations, the production build, daily backups, and the systemd service on port 3000.
 
 Defaults can be overridden with environment variables, e.g.:
 
