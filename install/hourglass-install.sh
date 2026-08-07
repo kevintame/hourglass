@@ -47,9 +47,9 @@ chown root:hourglass /etc/hourglass/hourglass.env
 chmod 0640 /etc/hourglass/hourglass.env
 
 cd /opt/hourglass
-runuser -u hourglass -- npm ci --silent
+runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=1536" npm ci --silent
 runuser -u hourglass -- env "DATABASE_URL=postgres://hourglass:${DB_PASSWORD}@127.0.0.1:5432/hourglass" npm run db:migrate
-runuser -u hourglass -- env NODE_ENV=production "DATABASE_URL=postgres://hourglass:${DB_PASSWORD}@127.0.0.1:5432/hourglass" npm run build
+runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=1536" NODE_ENV=production "DATABASE_URL=postgres://hourglass:${DB_PASSWORD}@127.0.0.1:5432/hourglass" npm run build
 chmod +x /opt/hourglass/deploy/backup.sh /opt/hourglass/deploy/update.sh
 msg_ok "Configured Hourglass"
 
