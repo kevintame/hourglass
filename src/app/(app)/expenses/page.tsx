@@ -2,6 +2,7 @@ import Link from "next/link";
 import { asc, desc, eq } from "drizzle-orm";
 import { Plus, Receipt, Trash2 } from "lucide-react";
 import { createExpenseAction, deleteExpenseAction, updateExpenseAction } from "@/app/actions";
+import { AddModal } from "@/components/add-modal";
 import { PageHeader } from "@/components/app-shell";
 import { db } from "@/db";
 import { clients, expenses, invoiceExpenses, invoices, projects, settings } from "@/db/schema";
@@ -32,9 +33,18 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const rows = allRows.filter((row) => view === "all" || (view === "billed" ? row.invoiceId !== null : row.invoiceId === null));
   const today = new Date().toISOString().slice(0, 10);
   const totalsByCurrency = rows.reduce((totals, row) => totals.set(row.expense.currency, (totals.get(row.expense.currency) ?? 0) + row.expense.amount), new Map<string, number>());
-  return <><PageHeader eyebrow="Billing" title="Expenses"/><div className="content">
+  const newExpenseForm=<form action={createExpenseAction} className="grid">
+    <div className="form-row"><div className="field"><label>Client</label><select className="input" name="clientId" required defaultValue=""><option value="" disabled>Choose a client</option>{activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></div><div className="field"><label>Project (optional)</label><select className="input" name="projectId" defaultValue=""><option value="">No project</option>{activeProjects.map(({ project, client }) => <option key={project.id} value={project.id}>{client.name} · {project.name}</option>)}</select></div></div>
+    <div className="form-row"><div className="field"><label>Date</label><input className="input" type="date" name="expenseDate" defaultValue={today} required/></div><div className="field"><label>Category</label><select className="input" name="category" defaultValue="other">{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></div>
+    <div className="form-row"><div className="field"><label>Vendor</label><input className="input" name="vendor" placeholder="Airline, restaurant, hotel…"/></div><div className="field"><label>Amount</label><input className="input" type="number" min="0.01" step="0.01" name="amount" placeholder="0.00" required/></div></div>
+    <div className="field"><label>Description</label><input className="input" name="description" placeholder="Client trip flight" required/></div>
+    <label className="small"><input type="checkbox" name="taxable"/> Apply invoice tax to this expense</label>
+    <div className="field"><label>Receipt (PDF, PNG, or JPEG; maximum 10 MB)</label><input className="input" type="file" name="receipt" accept="application/pdf,image/png,image/jpeg"/></div>
+    <button className="btn btn-primary" style={{ justifySelf: "end" }}><Plus size={15}/> Record expense</button>
+  </form>;
+  return <><PageHeader eyebrow="Billing" title="Expenses" action={<AddModal title="Record an expense" triggerLabel="Add expense" disabled={!activeClients.length}>{newExpenseForm}</AddModal>}/><div className="content">
     {query.error && <div className="alert">{query.error}</div>}
-    <div className="grid grid-2">
+    {!activeClients.length&&<div className="alert">Add a client before recording an expense.</div>}
       <section>
         <div className="section-head"><div><div className="eyebrow">Reimbursements</div><h2>{view === "all" ? "All expenses" : `${view[0].toUpperCase()}${view.slice(1)} expenses`}</h2></div><b>{totalsByCurrency.size ? [...totalsByCurrency].map(([currency, amount]) => formatMoney(amount, currency)).join(" · ") : formatMoney(0, business?.currency ?? "USD")}</b></div>
         <div style={{ display: "flex", gap: 8, marginBottom: 13, flexWrap: "wrap" }}>{["unbilled", "billed", "all"].map((item) => <Link key={item} href={`/expenses?view=${item}`} className={`btn ${view === item ? "btn-primary" : "btn-secondary"}`}>{item[0].toUpperCase() + item.slice(1)}</Link>)}</div>
@@ -56,15 +66,5 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
           </div>;
         }) : <div className="empty">No {view === "all" ? "" : `${view} `}expenses yet.</div>}</div>
       </section>
-      <section><div className="section-head"><div><div className="eyebrow">New</div><h2>Record an expense</h2></div></div><form action={createExpenseAction} className="card card-pad grid">
-        <div className="form-row"><div className="field"><label>Client</label><select className="input" name="clientId" required defaultValue=""><option value="" disabled>Choose a client</option>{activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></div><div className="field"><label>Project (optional)</label><select className="input" name="projectId" defaultValue=""><option value="">No project</option>{activeProjects.map(({ project, client }) => <option key={project.id} value={project.id}>{client.name} · {project.name}</option>)}</select></div></div>
-        <div className="form-row"><div className="field"><label>Date</label><input className="input" type="date" name="expenseDate" defaultValue={today} required/></div><div className="field"><label>Category</label><select className="input" name="category" defaultValue="other">{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></div>
-        <div className="form-row"><div className="field"><label>Vendor</label><input className="input" name="vendor" placeholder="Airline, restaurant, hotel…"/></div><div className="field"><label>Amount</label><input className="input" type="number" min="0.01" step="0.01" name="amount" placeholder="0.00" required/></div></div>
-        <div className="field"><label>Description</label><input className="input" name="description" placeholder="Client trip flight" required/></div>
-        <label className="small"><input type="checkbox" name="taxable"/> Apply invoice tax to this expense</label>
-        <div className="field"><label>Receipt (PDF, PNG, or JPEG; maximum 10 MB)</label><input className="input" type="file" name="receipt" accept="application/pdf,image/png,image/jpeg"/></div>
-        <button className="btn btn-primary" style={{ justifySelf: "start" }}><Plus size={15}/> Record expense</button>
-      </form></section>
-    </div>
   </div></>;
 }
