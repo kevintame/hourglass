@@ -1,0 +1,39 @@
+{
+  "name": "Hourglass",
+  "slug": "hourglass",
+  "categories": [23],
+  "date_created": "2026-08-07",
+  "type": "ct",
+  "updateable": true,
+  "privileged": false,
+  "architectures": ["amd64"],
+  "interface_port": 3000,
+  "documentation": "https://github.com/kevintame/hourglass#readme",
+  "website": "https://github.com/kevintame/hourglass",
+  "repository": "https://github.com/kevintame/hourglass",
+  "description": "A private, single-owner time tracker and invoicing application backed by PostgreSQL.",
+  "install_methods": [
+    {
+      "type": "default",
+      "script": "ct/hourglass.sh",
+      "config_path": "/etc/hourglass/hourglass.env",
+      "resources": {
+        "cpu": 2,
+        "ram": 2048,
+        "hdd": 8,
+        "os": "Debian",
+        "version": "13"
+      }
+    }
+  ],
+  "default_credentials": {
+    "username": null,
+    "password": null
+  },
+  "notes": [
+    {
+      "text": "Create the owner account through the web interface on first access.",
+      "type": "info"
+    }
+  ]
+}
