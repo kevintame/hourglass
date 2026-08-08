@@ -35,7 +35,7 @@ In the Proxmox host shell (console of the node, as root), run:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/main/deploy/proxmox.sh)"
 ```
 
-The installer uses the official [Proxmox VE Community Scripts](https://community-scripts.org/) `build.func` framework. Its Whiptail interface provides the same default and advanced configuration flow as other Community Scripts, including container resources, networking, DNS, SSH, features, and storage. It then creates an unprivileged Debian 13 LXC and installs Node.js 22, PostgreSQL, restricted service accounts, migrations, the production build, daily backups, and the systemd service on port 3000.
+The installer uses the official [Proxmox VE Community Scripts](https://community-scripts.org/) `build.func` framework. Its Whiptail interface provides the same default and advanced configuration flow as other Community Scripts, including container resources, networking, DNS, SSH, features, and storage. It then creates an unprivileged Debian 13 LXC with defaults of 4 CPU cores, 4096 MiB RAM, and a 12 GiB disk, and installs Node.js 22, PostgreSQL, restricted service accounts, migrations, the production build, daily backups, and the systemd service on port 3000.
 
 Defaults can be overridden with environment variables, e.g.:
 

@@ -17,9 +17,9 @@ _cs_fetch_text() {
 
 APP="Hourglass"
 var_tags="${var_tags:-time-tracking;invoicing;finance}"
-var_cpu="${var_cpu:-2}"
-var_ram="${var_ram:-2048}"
-var_disk="${var_disk:-8}"
+var_cpu="${var_cpu:-4}"
+var_ram="${var_ram:-4096}"
+var_disk="${var_disk:-12}"
 var_os="${var_os:-debian}"
 var_version="${var_version:-13}"
 var_unprivileged="${var_unprivileged:-1}"
@@ -55,9 +55,9 @@ function update_script() {
   create_backup /etc/hourglass/hourglass.env /var/lib/hourglass/uploads
   git pull --ff-only -q origin main
   chown -R hourglass:hourglass /opt/hourglass
-  runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=1536" npm ci --silent
+  runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --silent --no-audit --no-fund
   runuser -u hourglass -- env "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run db:migrate
-  runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=1536" NODE_ENV=production "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run build
+  runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=production "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run build
   restore_backup
 
   systemctl start hourglass
