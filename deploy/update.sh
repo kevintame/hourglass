@@ -6,7 +6,8 @@ cd /opt/hourglass
 systemctl stop hourglass
 trap 'systemctl start hourglass' EXIT
 if [[ -d .git ]]; then runuser -u hourglass -- git pull --ff-only; fi
-runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --no-audit --no-fund
+runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
+runuser -u hourglass -- node -e "Promise.all([import('argon2'), import('sharp')])"
 runuser -u hourglass -- env "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run db:migrate
 runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=production "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run build
 systemctl start hourglass

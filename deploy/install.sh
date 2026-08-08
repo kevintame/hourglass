@@ -49,7 +49,8 @@ if [[ "$SOURCE_DIR" != "$APP_DIR" ]]; then
 fi
 chown -R hourglass:hourglass "$APP_DIR" "$DATA_DIR" "$BACKUP_DIR"
 cd "$APP_DIR"
-runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --no-audit --no-fund
+runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
+runuser -u hourglass -- node -e "Promise.all([import('argon2'), import('sharp')])"
 runuser -u hourglass -- env "$(grep '^DATABASE_URL=' "$ENV_FILE")" npm run db:migrate
 runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=production "$(grep '^DATABASE_URL=' "$ENV_FILE")" npm run build
 chmod +x "$APP_DIR/deploy/backup.sh" "$APP_DIR/deploy/update.sh"

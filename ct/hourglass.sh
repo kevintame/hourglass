@@ -55,7 +55,8 @@ function update_script() {
   create_backup /etc/hourglass/hourglass.env /var/lib/hourglass/uploads
   git pull --ff-only -q origin main
   chown -R hourglass:hourglass /opt/hourglass
-  runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --silent --no-audit --no-fund
+  runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
+  runuser -u hourglass -- node -e "Promise.all([import('argon2'), import('sharp')])"
   runuser -u hourglass -- env "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run db:migrate
   runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=production "$(grep '^DATABASE_URL=' /etc/hourglass/hourglass.env)" npm run build
   restore_backup
