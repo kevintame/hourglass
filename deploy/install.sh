@@ -67,6 +67,9 @@ exec /opt/hourglass/deploy/update.sh "$@"
 EOF
 chmod +x /usr/bin/update
 
+PORT="$(awk -F= '/^PORT=/{print $2; exit}' "$ENV_FILE")"
+curl --fail --silent --show-error --retry 15 --retry-delay 2 --retry-connrefused "http://127.0.0.1:${PORT:-3000}/api/health" >/dev/null
+
 LXC_IP="$(hostname -I | awk '{print $1}')"
 echo
 echo "Hourglass is installed: http://${LXC_IP:-127.0.0.1}:3000"

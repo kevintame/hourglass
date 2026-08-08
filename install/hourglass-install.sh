@@ -62,6 +62,10 @@ systemctl daemon-reload
 systemctl enable -q --now hourglass.service hourglass-backup.timer
 msg_ok "Created services"
 
+msg_info "Verifying Hourglass is running"
+curl --fail --silent --show-error --retry 15 --retry-delay 2 --retry-connrefused http://127.0.0.1:3000/api/health >/dev/null
+msg_ok "Hourglass is running"
+
 motd_ssh
 customize
 

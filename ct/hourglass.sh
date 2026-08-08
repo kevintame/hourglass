@@ -41,8 +41,11 @@ function update_script() {
 
   msg_info "Checking for updates"
   cd /opt/hourglass
-  git fetch -q origin main
-  if [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]; then
+  # /opt/hourglass is owned by hourglass; running git as root there trips its
+  # dubious-ownership check.
+  app_git() { runuser -u hourglass -- git -C /opt/hourglass "$@"; }
+  app_git fetch -q origin main
+  if [[ "$(app_git rev-parse HEAD)" == "$(app_git rev-parse FETCH_HEAD)" ]]; then
     msg_ok "Already up to date"
     exit 0
   fi
@@ -53,7 +56,7 @@ function update_script() {
   msg_ok "Stopped Hourglass"
 
   create_backup /etc/hourglass/hourglass.env /var/lib/hourglass/uploads
-  git pull --ff-only -q origin main
+  app_git pull --ff-only -q origin main
   install -d -o hourglass -g hourglass -m 0750 /var/lib/hourglass /var/lib/hourglass/.npm
   chown -R hourglass:hourglass /opt/hourglass /var/lib/hourglass
   runuser -u hourglass -- env HOME=/var/lib/hourglass NPM_CONFIG_CACHE=/var/lib/hourglass/.npm NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
