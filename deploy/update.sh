@@ -56,6 +56,8 @@ runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=pr
 echo "Starting Hourglass..."
 systemctl start hourglass
 trap - EXIT
-curl --fail --silent --show-error --retry 10 --retry-delay 2 "http://127.0.0.1:${PORT}/api/health" >/dev/null
+# Type=simple means systemctl returns before Next.js is listening, and curl does not
+# retry a refused connection unless told to.
+curl --fail --silent --show-error --retry 10 --retry-delay 2 --retry-connrefused "http://127.0.0.1:${PORT}/api/health" >/dev/null
 
 echo "Hourglass updated to $(app_git rev-parse --short HEAD 2>/dev/null || echo 'local copy') and healthy."
