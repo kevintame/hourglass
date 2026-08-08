@@ -32,7 +32,7 @@ Open `http://localhost:3000`. The first visit creates the owner account. Run `np
 In the Proxmox host shell (console of the node, as root), run:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/main/deploy/proxmox.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/refs/heads/main/deploy/proxmox.sh)"
 ```
 
 The installer uses the official [Proxmox VE Community Scripts](https://community-scripts.org/) `build.func` framework. Its Whiptail interface provides the same default and advanced configuration flow as other Community Scripts, including container resources, networking, DNS, SSH, features, and storage. It then creates an unprivileged Debian 13 LXC with defaults of 4 CPU cores, 4096 MiB RAM, and a 12 GiB disk, and installs Node.js 22, PostgreSQL, restricted service accounts, migrations, the production build, daily backups, and the systemd service on port 3000.
@@ -40,7 +40,7 @@ The installer uses the official [Proxmox VE Community Scripts](https://community
 Defaults can be overridden with environment variables, e.g.:
 
 ```bash
-CTID=130 DISK_GB=12 NET=192.168.1.50/24 GATEWAY=192.168.1.1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/main/deploy/proxmox.sh)"
+CTID=130 DISK_GB=12 NET=192.168.1.50/24 GATEWAY=192.168.1.1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/kevintame/hourglass/refs/heads/main/deploy/proxmox.sh)"
 ```
 
 Available overrides: `CTID`, `CT_HOSTNAME`, `CORES`, `RAM_MB`, `SWAP_MB`, `DISK_GB`, `BRIDGE`, `NET` (dhcp or CIDR), `GATEWAY`, `ROOTFS_STORAGE`, `TEMPLATE_STORAGE`, `YES=1` (skip confirmation).

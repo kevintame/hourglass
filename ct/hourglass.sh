@@ -9,7 +9,7 @@ source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxV
 _cs_fetch_text() {
   local relative_file="${1:?relative file is required}"
   if [[ "$relative_file" == "install/hourglass-install.sh" ]]; then
-    curl -fsSL "${HOURGLASS_SCRIPTS_URL:-https://raw.githubusercontent.com/kevintame/hourglass/main}/${relative_file}"
+    curl -fsSL "${HOURGLASS_SCRIPTS_URL:-https://raw.githubusercontent.com/kevintame/hourglass/refs/heads/main}/${relative_file}"
   else
     curl -fsSL "${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/community-scripts/ProxmoxVED/main}/${relative_file}"
   fi
