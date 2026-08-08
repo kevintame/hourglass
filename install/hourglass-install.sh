@@ -16,7 +16,7 @@ msg_ok "Installed dependencies"
 
 msg_info "Creating service accounts and directories"
 id hourglass >/dev/null 2>&1 || useradd --system --home-dir /var/lib/hourglass --shell /usr/sbin/nologin hourglass
-install -d -o hourglass -g hourglass -m 0750 /opt/hourglass /var/lib/hourglass/uploads /var/backups/hourglass
+install -d -o hourglass -g hourglass -m 0750 /opt/hourglass /var/lib/hourglass /var/lib/hourglass/.npm /var/lib/hourglass/uploads /var/backups/hourglass
 install -d -o root -g hourglass -m 0750 /etc/hourglass
 msg_ok "Created service accounts and directories"
 
@@ -47,7 +47,7 @@ chown root:hourglass /etc/hourglass/hourglass.env
 chmod 0640 /etc/hourglass/hourglass.env
 
 cd /opt/hourglass
-$STD runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
+$STD runuser -u hourglass -- env HOME=/var/lib/hourglass NPM_CONFIG_CACHE=/var/lib/hourglass/.npm NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
 $STD runuser -u hourglass -- node -e "Promise.all([import('argon2'), import('sharp')])"
 runuser -u hourglass -- env "DATABASE_URL=postgres://hourglass:${DB_PASSWORD}@127.0.0.1:5432/hourglass" npm run db:migrate
 runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=production "DATABASE_URL=postgres://hourglass:${DB_PASSWORD}@127.0.0.1:5432/hourglass" npm run build

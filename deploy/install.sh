@@ -19,7 +19,7 @@ if ! command -v node >/dev/null || [[ "$(node -p 'Number(process.versions.node.s
 fi
 
 id hourglass >/dev/null 2>&1 || useradd --system --home-dir "$DATA_DIR" --shell /usr/sbin/nologin hourglass
-install -d -o hourglass -g hourglass -m 0750 "$APP_DIR" "$DATA_DIR/uploads" "$BACKUP_DIR"
+install -d -o hourglass -g hourglass -m 0750 "$APP_DIR" "$DATA_DIR" "$DATA_DIR/.npm" "$DATA_DIR/uploads" "$BACKUP_DIR"
 install -d -o root -g hourglass -m 0750 "$CONFIG_DIR"
 
 DB_PASSWORD=""
@@ -49,7 +49,7 @@ if [[ "$SOURCE_DIR" != "$APP_DIR" ]]; then
 fi
 chown -R hourglass:hourglass "$APP_DIR" "$DATA_DIR" "$BACKUP_DIR"
 cd "$APP_DIR"
-runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
+runuser -u hourglass -- env HOME="$DATA_DIR" NPM_CONFIG_CACHE="$DATA_DIR/.npm" NODE_OPTIONS="--max-old-space-size=3072" npm ci --ignore-scripts --no-audit --no-fund
 runuser -u hourglass -- node -e "Promise.all([import('argon2'), import('sharp')])"
 runuser -u hourglass -- env "$(grep '^DATABASE_URL=' "$ENV_FILE")" npm run db:migrate
 runuser -u hourglass -- env NODE_OPTIONS="--max-old-space-size=3072" NODE_ENV=production "$(grep '^DATABASE_URL=' "$ENV_FILE")" npm run build
