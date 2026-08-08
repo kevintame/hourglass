@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PDFDocument } from "pdf-lib";
+import { uploadDirectory } from "./config";
 
 export const MAX_RECEIPT_BYTES = 10_000_000;
 export const RECEIPT_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"] as const;
@@ -13,8 +14,7 @@ const extensionByType: Record<(typeof RECEIPT_MIME_TYPES)[number], string> = {
 };
 
 export function receiptDirectory() {
-  const uploadDir = process.env.UPLOAD_DIR ?? path.join(process.cwd(), "data", "uploads");
-  return path.join(uploadDir, "receipts");
+  return path.join(uploadDirectory(), "receipts");
 }
 
 export function receiptFilePath(filename: string) {

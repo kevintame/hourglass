@@ -5,6 +5,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { appUrl, servedOverHttps } from "./config";
 
 const COOKIE = "hourglass_session";
 const DAYS = 30;
@@ -21,7 +22,7 @@ export async function createSession(userId: string) {
   jar.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production" || process.env.TRUST_PROXY === "true",
+    secure: servedOverHttps(appUrl()),
     path: "/",
     expires: expiresAt,
   });

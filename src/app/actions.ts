@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { clients, expenses, invoiceExpenses, invoiceLines, invoices, invoiceTimeEntries, loginAttempts, projects, settings, timeEntries, users } from "@/db/schema";
 import { createSession, destroySession, requireUser } from "@/lib/auth";
+import { uploadDirectory } from "@/lib/config";
 import { calculateInvoiceAmounts, parseMoney, roundBillableMinutes } from "@/lib/money";
 import { deleteReceipt, saveReceipt } from "@/lib/receipts";
 
@@ -249,7 +250,7 @@ export async function saveSettingsAction(form: FormData) {
   let logoPath=existing?.logoPath??null; const logo=form.get("logo");
   if(logo instanceof File&&logo.size>0){
     if(logo.size>2_000_000||!["image/png","image/jpeg"].includes(logo.type)) redirect("/settings?error=Logo+must+be+a+PNG+or+JPEG+under+2MB");
-    const uploadDir=process.env.UPLOAD_DIR??path.join(process.cwd(),"data","uploads"); await mkdir(uploadDir,{recursive:true});
+    const uploadDir=uploadDirectory(); await mkdir(uploadDir,{recursive:true});
     const filename=`logo-${randomUUID()}.${logo.type==="image/png"?"png":"jpg"}`; await writeFile(path.join(uploadDir,filename),Buffer.from(await logo.arrayBuffer())); logoPath=path.join(uploadDir,filename);
   }
   const values = {
