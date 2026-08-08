@@ -9,12 +9,12 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Node 22 ships the same npm 10.x the LXC gets from NodeSource. A lockfile
       # written by a newer npm resolves differently and fails `npm ci` there with
       # EUSAGE, so this must stay pinned and uncached to catch the drift.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
