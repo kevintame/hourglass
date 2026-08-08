@@ -61,6 +61,12 @@ install -m 0644 "$APP_DIR/deploy/hourglass-backup.timer" /etc/systemd/system/hou
 systemctl daemon-reload
 systemctl enable --now hourglass.service hourglass-backup.timer
 
+cat <<'EOF' >/usr/bin/update
+#!/usr/bin/env bash
+exec /opt/hourglass/deploy/update.sh "$@"
+EOF
+chmod +x /usr/bin/update
+
 LXC_IP="$(hostname -I | awk '{print $1}')"
 echo
 echo "Hourglass is installed: http://${LXC_IP:-127.0.0.1}:3000"

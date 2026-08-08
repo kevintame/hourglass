@@ -64,4 +64,16 @@ msg_ok "Created services"
 
 motd_ssh
 customize
+
+# customize() points /usr/bin/update at community-scripts' ct/<var_os>.sh, which for
+# this container is the generic Debian script — it upgrades apt packages and never
+# touches Hourglass. Overwrite it so `update` updates the app.
+msg_info "Installing update command"
+cat <<'EOF' >/usr/bin/update
+#!/usr/bin/env bash
+exec /opt/hourglass/deploy/update.sh "$@"
+EOF
+chmod +x /usr/bin/update
+msg_ok "Installed update command"
+
 cleanup_lxc
